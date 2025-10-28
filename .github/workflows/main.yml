@@ -1,1 +1,39 @@
-1
+name: Multi Bluesky Reposter (Main)
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"  # elke 4 uur
+  workflow_dispatch:        # handmatig starten mogelijk
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: ⚙️ Install dependencies
+        run: |
+          pip install atproto
+
+      - name: 🚀 Run multi-account autoposter
+        env:
+          BSKY_USERNAME_BG: ${{ secrets.BSKY_USERNAME_BG }}
+          BSKY_PASSWORD_BG: ${{ secrets.BSKY_PASSWORD_BG }}
+          BSKY_USERNAME_BF: ${{ secrets.BSKY_USERNAME_BF }}
+          BSKY_PASSWORD_BF: ${{ secrets.BSKY_PASSWORD_BF }}
+          BSKY_USERNAME_BP: ${{ secrets.BSKY_USERNAME_BP }}
+          BSKY_PASSWORD_BP: ${{ secrets.BSKY_PASSWORD_BP }}
+          BSKY_USERNAME_NB: ${{ secrets.BSKY_USERNAME_NB }}
+          BSKY_PASSWORD_NB: ${{ secrets.BSKY_PASSWORD_NB }}
+          BSKY_USERNAME_HB: ${{ secrets.BSKY_USERNAME_HB }}
+          BSKY_PASSWORD_HB: ${{ secrets.BSKY_PASSWORD_HB }}
+          FEED: ${{ secrets.FEED }}
+        run: |
+          python testcase_multi.py
