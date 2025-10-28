@@ -1,9 +1,9 @@
-name: Bluesky Multi-Account Reposter (Main)
+name: Multi-Account Bluesky Reposter
 
 on:
   schedule:
-    - cron: "0 */4 * * *"   # elke 4 uur
-  workflow_dispatch:         # handmatig starten mogelijk
+    - cron: "0 */4 * * *"  # Elke 4 uur
+  workflow_dispatch:        # Handmatig starten mogelijk
 
 jobs:
   run:
@@ -36,5 +36,5 @@ jobs:
           BSKY_PASSWORD_HB: ${{ secrets.BSKY_PASSWORD_HB }}
         run: |
           echo "🚀 Start multi-account repost-run..."
-          python testcase_multi.py > /dev/null 2>&1 || echo "⚠️ Script klaar met waarschuwing."
+          python testcase_multi.py > /dev/null 2>&1 || echo "⚠️ Script afgerond met waarschuwing."
           echo "✅ Multi-account run afgerond."
