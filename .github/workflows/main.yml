@@ -1,28 +1,28 @@
-name: Multi-Account Bluesky Reposter
+name: Bluesky Multi-Account Reposter
 
 on:
   schedule:
-    - cron: "0 */4 * * *"  # Elke 4 uur
-  workflow_dispatch:        # Handmatig starten mogelijk
+    - cron: "0 */4 * * *"  # elke 4 uur uitvoeren
+  workflow_dispatch:        # handmatig starten mogelijk
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📦 Checkout repository
+      - name: 📦 Repository ophalen
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python
+      - name: 🐍 Python instellen
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: ⚙️ Install dependencies
+      - name: ⚙️ Dependencies installeren
         run: |
           pip install atproto
 
-      - name: 🚀 Run multi-account autoposter
+      - name: 🚀 Multi-account autoposter uitvoeren
         env:
           BSKY_USERNAME_BG: ${{ secrets.BSKY_USERNAME_BG }}
           BSKY_PASSWORD_BG: ${{ secrets.BSKY_PASSWORD_BG }}
