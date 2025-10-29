@@ -10,10 +10,12 @@ MAX_PER_USER = 3
 HOURS_BACK = 4
 
 def log(msg: str):
+    """Minimale log (alleen samenvatting aan eind)"""
     now = datetime.now(timezone.utc).strftime("[%H:%M:%S]")
     print(f"{now} {msg}")
 
 def parse_time(record, post):
+    """Zoek timestamp in record"""
     for attr in ["createdAt", "indexedAt", "created_at", "timestamp"]:
         val = getattr(record, attr, None) or getattr(post, attr, None)
         if val:
@@ -24,17 +26,16 @@ def parse_time(record, post):
     return None
 
 def main():
-    username = os.environ["BSKY_USERNAME"]
-    password = os.environ["BSKY_PASSWORD"]
+    username = os.environ["BSKY_USERNAME_BF"]
+    password = os.environ["BSKY_PASSWORD_BF"]
+
     client = Client()
     client.login(username, password)
-    log(f"✅ Ingelogd als {username}")
+    log("✅ Ingelogd.")
 
     try:
-        log("📥 Ophalen feed...")
         feed = client.app.bsky.feed.get_feed({"feed": FEED_URI, "limit": 100})
         items = feed.feed
-        log(f"🕒 {len(items)} posts opgehaald.")
     except Exception as e:
         log(f"⚠️ Fout bij ophalen feed: {e}")
         return
@@ -45,15 +46,15 @@ def main():
         with open(repost_log, "r") as f:
             done = set(f.read().splitlines())
 
-    all_posts = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=HOURS_BACK)
+    posts = []
 
     for item in items:
         post = item.post
         record = post.record
         uri = post.uri
         cid = post.cid
-        handle = getattr(post.author, "handle", "onbekend")
+        handle = getattr(post.author, "handle", "unknown")
 
         if hasattr(item, "reason") and item.reason is not None:
             continue
@@ -62,37 +63,31 @@ def main():
         if uri in done:
             continue
 
-        created_dt = parse_time(record, post)
-        if not created_dt or created_dt < cutoff:
+        created = parse_time(record, post)
+        if not created or created < cutoff:
             continue
 
-        all_posts.append({
-            "handle": handle,
-            "uri": uri,
-            "cid": cid,
-            "created": created_dt,
-        })
+        posts.append({"uri": uri, "cid": cid, "handle": handle, "created": created})
 
-    log(f"🧩 {len(all_posts)} geschikte posts gevonden.")
-    all_posts.sort(key=lambda x: x["created"])  # Oudste eerst
+    posts.sort(key=lambda x: x["created"])
+    total = len(posts)
+    log(f"📊 {total} geschikte posts gevonden.")
 
     reposted = 0
     liked = 0
-    per_user_count = {}
+    per_user = {}
 
-    for post in all_posts:
+    for post in posts:
         if reposted >= MAX_PER_RUN:
             break
-
         handle = post["handle"]
-        uri = post["uri"]
-        cid = post["cid"]
-
-        per_user_count[handle] = per_user_count.get(handle, 0)
-        if per_user_count[handle] >= MAX_PER_USER:
+        if per_user.get(handle, 0) >= MAX_PER_USER:
             continue
 
+        uri = post["uri"]
+        cid = post["cid"]
         try:
+            # Repost
             client.app.bsky.feed.repost.create(
                 repo=client.me.did,
                 record={
@@ -102,8 +97,9 @@ def main():
             )
             reposted += 1
             done.add(uri)
-            per_user_count[handle] += 1
+            per_user[handle] = per_user.get(handle, 0) + 1
 
+            # Like
             client.app.bsky.feed.like.create(
                 repo=client.me.did,
                 record={
@@ -112,15 +108,17 @@ def main():
                 },
             )
             liked += 1
+            time.sleep(1)
 
         except Exception as e:
-            log(f"⚠️ Fout bij @{handle}: {e}")
+            log(f"⚠️ Fout bij repost @{handle}: {e}")
 
     with open(repost_log, "w") as f:
         f.write("\n".join(done))
 
     log(f"✅ Klaar — {reposted} reposts uitgevoerd ({liked} geliked).")
-    log(f"⏰ Run afgerond om {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    log(f"🧹 Opschonen voltooid, repost-log behouden.")
+    log(f"⏰ Run afgerond op {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
 
 if __name__ == "__main__":
     main()
