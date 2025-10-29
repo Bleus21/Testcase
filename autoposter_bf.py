@@ -1,58 +1,35 @@
-from atproto import Client
-import os
-import time
-from datetime import datetime, timedelta, timezone
+name: Bluesky Auto Reposter (Beautyfan)
 
-# === CONFIG ===
-FEED_URI = "at://did:plc:jaka644beit3x4vmmg6yysw7/app.bsky.feed.generator/aaacy5fh4cqc4"
-MAX_PER_RUN = 30
-MAX_PER_USER = 3
-HOURS_BACK = 4
+on:
+  schedule:
+    - cron: "0 */4 * * *"  # elke 4 uur uitvoeren
+  workflow_dispatch:        # handmatig starten mogelijk
 
-def log(msg: str):
-    """Minimale logging met tijdstempel"""
-    now = datetime.now(timezone.utc).strftime("[%H:%M:%S]")
-    print(f"{now} {msg}")
+jobs:
+  run:
+    runs-on: ubuntu-latest
 
-def parse_time(record, post):
-    """Zoek timestamp"""
-    for attr in ["createdAt", "indexedAt", "created_at", "timestamp"]:
-        val = getattr(record, attr, None) or getattr(post, attr, None)
-        if val:
-            try:
-                return datetime.fromisoformat(val.replace("Z", "+00:00"))
-            except Exception:
-                continue
-    return None
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
 
-def main():
-    username = os.environ["BSKY_USERNAME_BF"]
-    password = os.environ["BSKY_PASSWORD_BF"]
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    client = Client()
-    client.login(username, password)
-    log("✅ Ingelogd.")
+      - name: ⚙️ Install dependencies
+        run: |
+          pip install atproto
 
-    # Ophalen feed
-    try:
-        feed = client.app.bsky.feed.get_feed({"feed": FEED_URI, "limit": 100}).feed
-        log(f"📥 {len(feed)} posts opgehaald uit feed.")
-    except Exception as e:
-        log(f"⚠️ Fout bij ophalen feed: {e}")
-        return
-
-    # Repost-log laden
-    repost_log = "reposted_bf.txt"
-    done = set()
-    if os.path.exists(repost_log):
-        with open(repost_log, "r") as f:
-            done = set(f.read().splitlines())
-
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=HOURS_BACK)
-    all_posts = []
-
-    for item in feed:
-        post = item.post
-        record = post.record
-        uri = post.uri
-        cid = post.cid
+      - name: 🚀 Run autoposter (Beautyfan)
+        env:
+          BSKY_USERNAME: ${{ secrets.BSKY_USERNAME_BF }}
+          BSKY_PASSWORD: ${{ secrets.BSKY_PASSWORD_BF }}
+        run: |
+          echo "🚀 Start Beautyfan autoposter run..."
+          python autoposter_bf.py > autoposter_output.log 2>&1
+          echo "📄 --- Begin output ---"
+          cat autoposter_output.log
+          echo "📄 --- End output ---"
+          echo "✅ Run voltooid."
