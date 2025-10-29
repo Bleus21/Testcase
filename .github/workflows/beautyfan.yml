@@ -2,7 +2,7 @@ name: Bluesky Auto Reposter (Beautyfan)
 
 on:
   schedule:
-    - cron: "0 */4 * * *"  # elke 4 uur
+    - cron: "0 */3 * * *"  # elke 3 uur
   workflow_dispatch:
 
 jobs:
