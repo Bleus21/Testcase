@@ -7,14 +7,15 @@ FEED_URI = "at://did:plc:jaka644beit3x4vmmg6yysw7/app.bsky.feed.generator/aaacy5
 MAX_PER_RUN = 30
 MAX_PER_USER = 3
 HOURS_BACK = 4
+REPOST_LOG = "reposted_nb.txt"
 
 def log(msg: str):
-    """Eenvoudige console logging."""
+    """Print logregel met tijdstempel (stille versie, zonder namen)."""
     now = datetime.now(timezone.utc).strftime("[%H:%M:%S]")
     print(f"{now} {msg}")
 
 def parse_time(record, post):
-    """Haal posttijd op."""
+    """Probeer timestamp te vinden."""
     for attr in ["createdAt", "indexedAt", "created_at", "timestamp"]:
         val = getattr(record, attr, None) or getattr(post, attr, None)
         if val:
@@ -30,10 +31,10 @@ def main():
 
     client = Client()
     client.login(username, password)
-    log(f"✅ Ingelogd als {username}")
+    log("✅ Ingelogd.")
+    log("📥 Ophalen feed...")
 
     try:
-        log("📥 Ophalen feed...")
         feed = client.app.bsky.feed.get_feed({"feed": FEED_URI, "limit": 100})
         items = feed.feed
         log(f"📊 {len(items)} posts gevonden in feed.")
@@ -41,22 +42,22 @@ def main():
         log(f"⚠️ Fout bij ophalen feed: {e}")
         return
 
-    repost_log = "reposted_nb.txt"
     done = set()
-    if os.path.exists(repost_log):
-        with open(repost_log, "r") as f:
+    if os.path.exists(REPOST_LOG):
+        with open(REPOST_LOG, "r", encoding="utf-8") as f:
             done = set(f.read().splitlines())
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=HOURS_BACK)
     all_posts = []
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=HOURS_BACK)
 
     for item in items:
         post = item.post
         record = post.record
         uri = post.uri
         cid = post.cid
-        handle = getattr(post.author, "handle", "onbekend")
+        handle = getattr(post.author, "handle", "unknown")
 
+        # Skip replies, reposts, en reeds verwerkte posts
         if hasattr(item, "reason") and item.reason is not None:
             continue
         if getattr(record, "reply", None):
@@ -75,15 +76,22 @@ def main():
             "created": created_dt,
         })
 
-    all_posts.sort(key=lambda x: x["created"])
-    to_repost = all_posts[:MAX_PER_RUN]
-    log(f"🧩 {len(to_repost)} geschikte posts gevonden.")
+    total = len(all_posts)
+    log(f"🧩 {total} geschikte posts gevonden.")
+    all_posts.sort(key=lambda x: x["created"])  # Oudste eerst
 
-    reposted, liked = 0, 0
+    reposted = 0
+    liked = 0
     per_user = {}
 
-    for post in to_repost:
-        handle, uri, cid = post["handle"], post["uri"], post["cid"]
+    for post in all_posts:
+        if reposted >= MAX_PER_RUN:
+            break
+
+        handle = post["handle"]
+        uri = post["uri"]
+        cid = post["cid"]
+
         per_user[handle] = per_user.get(handle, 0)
         if per_user[handle] >= MAX_PER_USER:
             continue
@@ -97,9 +105,9 @@ def main():
                 },
             )
             reposted += 1
-            done.add(uri)
             per_user[handle] += 1
-            log(f"🔁 Gerepost @{handle}")
+            done.add(uri)
+            log(f"🔁 Gerepost ({reposted}/{MAX_PER_RUN})")
 
             try:
                 client.app.bsky.feed.like.create(
@@ -110,17 +118,18 @@ def main():
                     },
                 )
                 liked += 1
-                log(f"❤️ Geliked @{handle}")
-            except Exception as e:
-                log(f"⚠️ Fout bij liken @{handle}: {e}")
+                log(f"❤️ Geliked ({liked}/{MAX_PER_RUN})")
+            except Exception:
+                continue
 
-        except Exception as e:
-            log(f"⚠️ Fout bij repost @{handle}: {e}")
+        except Exception:
+            continue
 
-    with open(repost_log, "w") as f:
+    with open(REPOST_LOG, "w", encoding="utf-8") as f:
         f.write("\n".join(done))
 
     log(f"✅ Klaar — {reposted} reposts uitgevoerd ({liked} geliked).")
+    log(f"🧹 Opschonen voltooid, repost-log behouden.")
     log(f"⏰ Run afgerond om {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
 
 if __name__ == "__main__":
