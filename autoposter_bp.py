@@ -5,13 +5,14 @@ from datetime import datetime, timedelta, timezone
 
 # === CONFIG ===
 FEED_URI = "at://did:plc:jaka644beit3x4vmmg6yysw7/app.bsky.feed.generator/aaacy5fh4cqc4"
-MAX_PER_RUN = 30
-MAX_PER_USER = 3
-HOURS_BACK = 4  # posts van de laatste 4 uur
+MAX_PER_RUN = 50
+MAX_PER_USER = 5
+HOURS_BACK = 4
+REPOST_LOG = "reposted_bp.txt"
 
 def log(msg: str):
-    """Minimale logging naar console"""
-    print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] {msg}")
+    now = datetime.now(timezone.utc).strftime("[%H:%M:%S]")
+    print(f"{now} {msg}")
 
 def parse_time(record, post):
     for attr in ["createdAt", "indexedAt", "created_at", "timestamp"]:
@@ -38,14 +39,13 @@ def main():
         log(f"⚠️ Fout bij ophalen feed: {e}")
         return
 
-    repost_log = "reposted_bp.txt"
     done = set()
-    if os.path.exists(repost_log):
-        with open(repost_log, "r") as f:
+    if os.path.exists(REPOST_LOG):
+        with open(REPOST_LOG, "r") as f:
             done = set(f.read().splitlines())
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=HOURS_BACK)
-    all_posts = []
+    posts = []
     for item in items:
         post = item.post
         record = post.record
@@ -53,43 +53,32 @@ def main():
         cid = post.cid
         handle = getattr(post.author, "handle", "onbekend")
 
-        if hasattr(item, "reason") and item.reason is not None:
+        if getattr(record, "reply", None) or uri in done:
             continue
-        if getattr(record, "reply", None):
-            continue
-        if uri in done:
-            continue
-
         created_dt = parse_time(record, post)
         if not created_dt or created_dt < cutoff:
             continue
 
-        all_posts.append({
-            "handle": handle,
-            "uri": uri,
-            "cid": cid,
-            "created": created_dt,
-        })
+        posts.append({"uri": uri, "cid": cid, "handle": handle, "created": created_dt})
 
-    all_posts.sort(key=lambda x: x["created"])  # oudste eerst
+    posts.sort(key=lambda x: x["created"])
+    posts = posts[:MAX_PER_RUN]
+    log(f"🧩 {len(posts)} geschikte posts gevonden.")
 
     reposted = 0
     liked = 0
     per_user = {}
 
-    for post in all_posts:
-        if reposted >= MAX_PER_RUN:
-            break
-        handle = post["handle"]
-        uri = post["uri"]
-        cid = post["cid"]
+    for p in posts:
+        handle = p["handle"]
+        uri = p["uri"]
+        cid = p["cid"]
 
         per_user[handle] = per_user.get(handle, 0)
         if per_user[handle] >= MAX_PER_USER:
             continue
 
         try:
-            # Repost
             client.app.bsky.feed.repost.create(
                 repo=client.me.did,
                 record={
@@ -100,9 +89,8 @@ def main():
             done.add(uri)
             reposted += 1
             per_user[handle] += 1
-            log(f"🔁 @{handle}")
+            time.sleep(1.5)
 
-            # Like
             try:
                 client.app.bsky.feed.like.create(
                     repo=client.me.did,
@@ -112,18 +100,16 @@ def main():
                     },
                 )
                 liked += 1
-            except Exception as e:
-                log(f"⚠️ Like mislukt @{handle}: {e}")
+                time.sleep(1)
+            except Exception:
+                continue
+        except Exception:
+            continue
 
-            time.sleep(1)
-
-        except Exception as e:
-            log(f"⚠️ Repost mislukt @{handle}: {e}")
-
-    with open(repost_log, "w") as f:
+    with open(REPOST_LOG, "w") as f:
         f.write("\n".join(done))
 
-    log(f"✅ Klaar — {reposted} reposts uitgevoerd ({liked} likes).")
+    log(f"✅ Klaar — {reposted} reposts uitgevoerd ({liked} geliked).")
     log(f"🧹 Opschonen voltooid, repost-log behouden.")
     log(f"⏰ Run afgerond op {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
 
