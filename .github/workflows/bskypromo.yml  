@@ -10,19 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: 📦 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install atproto
+      - name: ⚙️ Install dependencies
+        run: |
+          pip install atproto
 
-      - name: Run autoposter (bskypromo)
+      - name: 🚀 Run autoposter (bskypromo)
         env:
           BSKY_USERNAME_BP: ${{ secrets.BSKY_USERNAME_BP }}
           BSKY_PASSWORD_BP: ${{ secrets.BSKY_PASSWORD_BP }}
-        run: python autoposter_bp.py
+        run: |
+          python autoposter_bp.py
