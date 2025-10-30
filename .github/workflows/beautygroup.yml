@@ -2,7 +2,7 @@ name: Bluesky Auto Reposter (BeautyGroup)
 
 on:
   schedule:
-    - cron: "0 */3 * * *"  # elke 3 uur uitvoeren
+    - cron: "0 */2 * * *"  # elke 3 uur uitvoeren
   workflow_dispatch:        # handmatig starten mogelijk
 
 jobs:
