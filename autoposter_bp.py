@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 # === CONFIG ===
 FEED_URI = "at://did:plc:jaka644beit3x4vmmg6yysw7/app.bsky.feed.generator/aaae6jfc5w2oi"
 MAX_PER_RUN = 50
-MAX_PER_USER = 5
+MAX_PER_USER = 10
 HOURS_BACK = 3
 REPOST_LOG = "reposted_bp.txt"
 
