@@ -2,7 +2,7 @@ name: Bluesky Auto Reposter (bskypromo)
 
 on:
   schedule:
-    - cron: "0 */2 * * *"  # elke 2 uur
+    - cron: "0 */1 * * *"  # elke 2 uur
   workflow_dispatch:
 
 jobs:
